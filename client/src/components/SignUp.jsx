@@ -3,8 +3,7 @@ import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff, MessageCircle } from 'lucide-react';
-import { API_URL } from "../config/api";
-
+import { API_BASE_URL } from "../config";
 
 function SignUp() {
     const [username, setUsername] = useState("");
@@ -31,7 +30,7 @@ function SignUp() {
         }
 
         setLoading(true);
-        axios.post(`${API_URL}/api/signup`, {
+        axios.post(`${API_BASE_URL}/api/signup`, {
             username,
             email,
             password,

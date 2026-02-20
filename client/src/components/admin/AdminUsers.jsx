@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Search, Filter, Ban, RotateCcw, Trash2, ShieldCheck, MoreVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { API_URL } from "../../config/api";
-
+import { API_BASE_URL } from '../../config';
 
 const AdminUsers = () => {
     const [users, setUsers] = useState([]);
@@ -16,7 +15,7 @@ const AdminUsers = () => {
         setLoading(true);
         const token = localStorage.getItem('token');
         try {
-            const res = await axios.get(`${API_URL}/api/admin/users?search=${search}&filter=${filter}`, {
+            const res = await axios.get(`${API_BASE_URL}/api/admin/users?search=${search}&filter=${filter}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setUsers(res.data.users);
@@ -35,7 +34,7 @@ const AdminUsers = () => {
         if (!window.confirm(`Are you sure you want to ${currentStatus ? 'unban' : 'ban'} this user?`)) return;
         const token = localStorage.getItem('token');
         try {
-            await axios.put(`${API_URL}/api/admin/users/${id}/ban`, {}, {
+            await axios.put(`${API_BASE_URL}/api/admin/users/${id}/ban`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             fetchUsers();
@@ -48,7 +47,7 @@ const AdminUsers = () => {
         if (!window.confirm("CRITICAL: Permanent delete user data. Proceed?")) return;
         const token = localStorage.getItem('token');
         try {
-            await axios.delete(`${API_URL}/api/admin/users/${id}`, {
+            await axios.delete(`${API_BASE_URL}/api/admin/users/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             fetchUsers();
@@ -60,7 +59,7 @@ const AdminUsers = () => {
     const handleVerifyToggle = async (id) => {
         const token = localStorage.getItem('token');
         try {
-            await axios.put(`${API_URL}/api/admin/users/${id}/verify`, {}, {
+            await axios.put(`${API_BASE_URL}/api/admin/users/${id}/verify`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             fetchUsers();

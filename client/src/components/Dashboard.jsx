@@ -3,8 +3,6 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import io from "socket.io-client";
 import ChatWindow from "./ChatWindow";
-import { API_URL, SOCKET_URL } from "../config/api";
-
 
 function parseJwt(token) {
 	if (!token) return null;
@@ -36,6 +34,8 @@ import {
 	Edit,
 	Loader2
 } from "lucide-react";
+
+import { API_BASE_URL } from "../config";
 
 function Dashboard() {
 	const [user, setUser] = useState(null);
@@ -69,7 +69,7 @@ function Dashboard() {
 					username: decoded.username,
 					email: decoded.email,
 				});
-				const socket = io(SOCKET_URL, { auth: { token } });
+				const socket = io(API_BASE_URL, { auth: { token } });
 				socketRef.current = socket;
 				socket.on("connect", () => {
 					if (socketRef.current && decoded.id) socketRef.current.emit("joinChat", decoded.id);
@@ -93,7 +93,7 @@ function Dashboard() {
 		if (!user) return;
 		try {
 			const token = localStorage.getItem("token");
-			const res = await axios.get(`${API_URL}/api/users`, {
+			const res = await axios.get(`${API_BASE_URL}/api/users`, {
 				headers: { Authorization: `Bearer ${token}` },
 			});
 			setUserList(res.data.users.map(u => ({
@@ -116,7 +116,7 @@ function Dashboard() {
 		setUserList(prev => prev.map(u => u._id === id ? { ...u, hasNew: false } : u));
 		const token = localStorage.getItem("token");
 		try {
-			const res = await axios.get(`${API_URL}/api/chats/${id}`, {
+			const res = await axios.get(`${API_BASE_URL}/api/chats/${id}`, {
 				headers: { Authorization: `Bearer ${token}` },
 			});
 			setSelectedChat(res.data.chat);
@@ -174,7 +174,7 @@ function Dashboard() {
 
 		// Fetch messages
 		axios
-			.get(`${API_URL}/api/messages/${selectedChat._id}`, {
+			.get(`${API_BASE_URL}/api/messages/${selectedChat._id}`, {
 				headers: { Authorization: `Bearer ${token}` },
 			})
 			.then((res) => setMessages(res.data))
@@ -182,7 +182,7 @@ function Dashboard() {
 
 		// Fetch pinned messages for this chat
 		axios
-			.get(`${API_URL}/api/pinned/${selectedChat._id}`, {
+			.get(`${API_BASE_URL}/api/pinned/${selectedChat._id}`, {
 				headers: { Authorization: `Bearer ${token}` },
 			})
 			.then((res) => setPinnedMessages(res.data))
@@ -339,7 +339,7 @@ function Dashboard() {
 	const handleBlock = async (targetId) => {
 		try {
 			const token = localStorage.getItem("token");
-			const res = await axios.post(`${API_URL}/api/user/block`, { targetUserId: targetId }, {
+			const res = await axios.post(`${API_BASE_URL}/api/user/block`, { targetUserId: targetId }, {
 				headers: { Authorization: `Bearer ${token}` }
 			});
 			// Update local state
@@ -355,7 +355,7 @@ function Dashboard() {
 	const handleUnblock = async (targetId) => {
 		try {
 			const token = localStorage.getItem("token");
-			await axios.post(`${API_URL}/api/user/unblock`, { targetUserId: targetId }, {
+			await axios.post(`${API_BASE_URL}/api/user/unblock`, { targetUserId: targetId }, {
 				headers: { Authorization: `Bearer ${token}` }
 			});
 			fetchUser(); // Refresh list to maybe show them again if they weren't blocked by other criteria
@@ -368,7 +368,7 @@ function Dashboard() {
 	const handleReport = async (targetId, reason, description) => {
 		try {
 			const token = localStorage.getItem("token");
-			await axios.post(`${API_URL}/api/report`, { reportedUserId: targetId, reason, description }, {
+			await axios.post(`${API_BASE_URL}/api/report`, { reportedUserId: targetId, reason, description }, {
 				headers: { Authorization: `Bearer ${token}` }
 			});
 			alert("Report submitted successfully");
@@ -580,9 +580,9 @@ function Dashboard() {
 							onUnpin={handleUnpin}
 							currentUser={user}
 							partner={userList.find(u => u._id === activeUserId)}
-							isPartnerTyping={!!typingUsers[activeUserId]}
-							onTypingStart={() => socketRef.current.emit('typingStart', { chatId: selectedChat._id, receiverId: activeUserId })}
-							onTypingStop={() => socketRef.current.emit('typingStop', { chatId: selectedChat._id, receiverId: activeUserId })}
+							isPartnerTyping={typingUsers[selectedChat._id]?.length > 0}
+							onTypingStart={() => socketRef.current.emit('typing', { chatId: selectedChat._id })}
+							onTypingStop={() => socketRef.current.emit('stopTyping', { chatId: selectedChat._id })}
 							onBack={() => { setMobileShowChat(false); setActiveUserId(null); }}
 							pinnedMessages={pinnedMessages}
 							onBlock={handleBlock}

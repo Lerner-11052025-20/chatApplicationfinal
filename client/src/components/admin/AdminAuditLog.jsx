@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { History, ShieldAlert, User, MessageCircle, AlertTriangle } from 'lucide-react';
-import { API_URL } from "../../config/api";
-
+import { API_BASE_URL } from '../../config';
 
 const AdminAuditLog = () => {
     const [logs, setLogs] = useState([]);
@@ -12,7 +11,7 @@ const AdminAuditLog = () => {
         setLoading(true);
         const token = localStorage.getItem('token');
         try {
-            const res = await axios.get(`${API_URL}/api/admin/audit`, {
+            const res = await axios.get(`${API_BASE_URL}/api/admin/audit`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setLogs(res.data.logs);

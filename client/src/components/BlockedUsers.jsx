@@ -3,7 +3,7 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, UserX, Shield, User, Search, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { API_URL } from "../config/api";
+import { API_BASE_URL } from "../config";
 
 
 const BlockedUsers = () => {
@@ -16,7 +16,7 @@ const BlockedUsers = () => {
         setLoading(true);
         const token = localStorage.getItem('token');
         try {
-            const res = await axios.get(`${API_URL}/api/user/blocked`, {
+            const res = await axios.get(`${API_BASE_URL}/api/user/blocked`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setBlockedList(res.data.blockedUsers || []);
@@ -34,7 +34,7 @@ const BlockedUsers = () => {
     const handleUnblock = async (id) => {
         const token = localStorage.getItem('token');
         try {
-            await axios.post(`${API_URL}/api/user/unblock`, { targetUserId: id }, {
+            await axios.post(`${API_BASE_URL}/api/user/unblock`, { targetUserId: id }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             fetchBlockedUsers();

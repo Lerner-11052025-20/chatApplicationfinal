@@ -19,8 +19,7 @@ import {
 } from "lucide-react";
 import VerifiedBadge from "./common/VerifiedBadge";
 import { toast } from "react-hot-toast"; // assuming toast might be used elsewhere or adding basic alert logic
-import { API_URL } from "../config/api";
-
+import { API_BASE_URL } from "../config";
 
 function parseJwt(token) {
 	if (!token) return null;
@@ -61,7 +60,7 @@ function Profile() {
 					email: decoded.email,
 				});
 
-				const res = await axios.get(`${API_URL}/api/me`, {
+				const res = await axios.get(`${API_BASE_URL}/api/me`, {
 					headers: { Authorization: `Bearer ${token}` },
 				});
 				setFullUser(res.data);

@@ -3,8 +3,7 @@ import axios from "axios";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Lock, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound } from "lucide-react";
-import { API_URL } from "../config/api";
-
+import { API_BASE_URL } from "../config";
 
 function ResetPassword() {
     const { token } = useParams();
@@ -24,7 +23,7 @@ function ResetPassword() {
         if (password.length < 6) return setError("Password must be at least 6 characters");
 
         setLoading(true);
-        axios.post(`${API_URL}/api/resetpassword/${token}`, { password })
+        axios.post(`${API_BASE_URL}/api/resetpassword/${token}`, { password })
             .then(() => {
                 setSuccess(true);
                 setTimeout(() => navigate("/login"), 2000);

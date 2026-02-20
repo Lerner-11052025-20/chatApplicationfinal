@@ -3,8 +3,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, Loader2, AlertCircle, Eye, EyeOff, MessageCircle } from 'lucide-react';
-import { API_URL } from "../config/api";
-
+import { API_BASE_URL } from "../config";
 
 function Login() {
     const [email, setEmail] = useState("");
@@ -19,7 +18,7 @@ function Login() {
         setLoading(true);
         setError("");
 
-        axios.post(`${API_URL}/api/login`, { email, password })
+        axios.post(`${API_BASE_URL}/api/login`, { email, password })
             .then(res => {
                 localStorage.setItem('token', res.data.token);
                 navigate('/dashboard');

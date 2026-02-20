@@ -27,11 +27,24 @@ const onlineUsers = new Map();
 
 const MONGO_URI = process.env.MONGO_URI;
 mongoose
-	.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-	.then(() => {
-		console.log("MongoDB Connected");
+	.connect(MONGO_URI, {
+		useNewUrlParser: true,
+		useUnifiedTopology: true,
+		serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of buffering indefinitely
+		socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
 	})
-	.catch((err) => console.log(err));
+	.then(() => {
+		console.log("MongoDB Connected Successfully");
+	})
+	.catch((err) => {
+		console.error("MongoDB Connection Error Details:");
+		console.error("Error Name:", err.name);
+		console.error("Error Message:", err.message);
+		if (err.reason) {
+			console.error("Reason:", err.reason);
+		}
+		console.log("\nTIP: If you see 'ReplicaSetNoPrimary' or 'buffering timed out', please check your MongoDB Atlas 'Network Access' settings and ensure your current IP address is whitelisted.\n");
+	});
 
 app.use("/api", authRoutes);
 app.use("/api", chatRoutes);
