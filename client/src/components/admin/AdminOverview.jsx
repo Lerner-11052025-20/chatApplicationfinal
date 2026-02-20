@@ -14,6 +14,8 @@ import {
     LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar,
     PieChart, Pie, Cell
 } from 'recharts';
+import { API_URL } from "../../config/api";
+
 
 const AdminOverview = () => {
     const [stats, setStats] = useState(null);
@@ -27,9 +29,9 @@ const AdminOverview = () => {
             const headers = { Authorization: `Bearer ${token}` };
             try {
                 const [s, m, u] = await Promise.all([
-                    axios.get('http://localhost:3334/api/admin/stats', { headers }),
-                    axios.get('http://localhost:3334/api/admin/analytics/messages-per-day', { headers }),
-                    axios.get('http://localhost:3334/api/admin/analytics/users-per-week', { headers }),
+                    axios.get(`${API_URL}/api/admin/stats`, { headers }),
+                    axios.get(`${API_URL}/api/admin/analytics/messages-per-day`, { headers }),
+                    axios.get(`${API_URL}/api/admin/analytics/users-per-week`, { headers }),
                 ]);
                 setStats(s.data);
                 setMsgData(m.data);

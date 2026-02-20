@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import io from "socket.io-client";
 import ChatWindow from "./ChatWindow";
+import { API_URL, SOCKET_URL } from "../config/api";
+
 
 function parseJwt(token) {
 	if (!token) return null;
@@ -67,7 +69,7 @@ function Dashboard() {
 					username: decoded.username,
 					email: decoded.email,
 				});
-				const socket = io("http://localhost:3334", { auth: { token } });
+				const socket = io(SOCKET_URL, { auth: { token } });
 				socketRef.current = socket;
 				socket.on("connect", () => {
 					if (socketRef.current && decoded.id) socketRef.current.emit("joinChat", decoded.id);
@@ -91,7 +93,7 @@ function Dashboard() {
 		if (!user) return;
 		try {
 			const token = localStorage.getItem("token");
-			const res = await axios.get("http://localhost:3334/api/users", {
+			const res = await axios.get(`${API_URL}/api/users`, {
 				headers: { Authorization: `Bearer ${token}` },
 			});
 			setUserList(res.data.users.map(u => ({
@@ -114,7 +116,7 @@ function Dashboard() {
 		setUserList(prev => prev.map(u => u._id === id ? { ...u, hasNew: false } : u));
 		const token = localStorage.getItem("token");
 		try {
-			const res = await axios.get(`http://localhost:3334/api/chats/${id}`, {
+			const res = await axios.get(`${API_URL}/api/chats/${id}`, {
 				headers: { Authorization: `Bearer ${token}` },
 			});
 			setSelectedChat(res.data.chat);
@@ -172,7 +174,7 @@ function Dashboard() {
 
 		// Fetch messages
 		axios
-			.get(`http://localhost:3334/api/messages/${selectedChat._id}`, {
+			.get(`${API_URL}/api/messages/${selectedChat._id}`, {
 				headers: { Authorization: `Bearer ${token}` },
 			})
 			.then((res) => setMessages(res.data))
@@ -180,7 +182,7 @@ function Dashboard() {
 
 		// Fetch pinned messages for this chat
 		axios
-			.get(`http://localhost:3334/api/pinned/${selectedChat._id}`, {
+			.get(`${API_URL}/api/pinned/${selectedChat._id}`, {
 				headers: { Authorization: `Bearer ${token}` },
 			})
 			.then((res) => setPinnedMessages(res.data))
@@ -337,7 +339,7 @@ function Dashboard() {
 	const handleBlock = async (targetId) => {
 		try {
 			const token = localStorage.getItem("token");
-			const res = await axios.post("http://localhost:3334/api/user/block", { targetUserId: targetId }, {
+			const res = await axios.post(`${API_URL}/api/user/block`, { targetUserId: targetId }, {
 				headers: { Authorization: `Bearer ${token}` }
 			});
 			// Update local state
@@ -353,7 +355,7 @@ function Dashboard() {
 	const handleUnblock = async (targetId) => {
 		try {
 			const token = localStorage.getItem("token");
-			await axios.post("http://localhost:3334/api/user/unblock", { targetUserId: targetId }, {
+			await axios.post(`${API_URL}/api/user/unblock`, { targetUserId: targetId }, {
 				headers: { Authorization: `Bearer ${token}` }
 			});
 			fetchUser(); // Refresh list to maybe show them again if they weren't blocked by other criteria
@@ -366,7 +368,7 @@ function Dashboard() {
 	const handleReport = async (targetId, reason, description) => {
 		try {
 			const token = localStorage.getItem("token");
-			await axios.post("http://localhost:3334/api/report", { reportedUserId: targetId, reason, description }, {
+			await axios.post(`${API_URL}/api/report`, { reportedUserId: targetId, reason, description }, {
 				headers: { Authorization: `Bearer ${token}` }
 			});
 			alert("Report submitted successfully");

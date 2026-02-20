@@ -3,6 +3,8 @@ import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff, MessageCircle } from 'lucide-react';
+import { API_URL } from "../config/api";
+
 
 function SignUp() {
     const [username, setUsername] = useState("");
@@ -29,7 +31,7 @@ function SignUp() {
         }
 
         setLoading(true);
-        axios.post("http://localhost:3334/api/signup", {
+        axios.post(`${API_URL}/api/signup`, {
             username,
             email,
             password,

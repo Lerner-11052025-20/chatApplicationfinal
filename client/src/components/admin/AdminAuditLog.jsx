@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { History, ShieldAlert, User, MessageCircle, AlertTriangle } from 'lucide-react';
+import { API_URL } from "../../config/api";
+
 
 const AdminAuditLog = () => {
     const [logs, setLogs] = useState([]);
@@ -10,7 +12,7 @@ const AdminAuditLog = () => {
         setLoading(true);
         const token = localStorage.getItem('token');
         try {
-            const res = await axios.get('http://localhost:3334/api/admin/audit', {
+            const res = await axios.get(`${API_URL}/api/admin/audit`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setLogs(res.data.logs);
@@ -56,8 +58,8 @@ const AdminAuditLog = () => {
                                         <span className="font-black text-white text-sm">{log.admin?.username || 'System'}</span>
                                         <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">performed</span>
                                         <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg border ${log.action.includes('BAN') ? 'text-red-500 border-red-500/20 bg-red-500/10' :
-                                                log.action.includes('DELETE') ? 'text-orange-500 border-orange-500/20 bg-orange-500/10' :
-                                                    'text-blue-500 border-blue-500/20 bg-blue-500/10'
+                                            log.action.includes('DELETE') ? 'text-orange-500 border-orange-500/20 bg-orange-500/10' :
+                                                'text-blue-500 border-blue-500/20 bg-blue-500/10'
                                             }`}>
                                             {log.action.replace('_', ' ')}
                                         </span>

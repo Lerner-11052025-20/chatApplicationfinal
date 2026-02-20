@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Trash2, ShieldAlert, MessageCircle, AlertCircle, Flag, UserX, CheckCircle, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_URL } from "../../config/api";
+
 
 const AdminContent = () => {
     const [messages, setMessages] = useState([]);
@@ -15,12 +17,12 @@ const AdminContent = () => {
         const token = localStorage.getItem('token');
         try {
             if (activeTab === 'messages') {
-                const res = await axios.get(`http://localhost:3334/api/admin/messages?filter=${filter}`, {
+                const res = await axios.get(`${API_URL}/api/admin/messages?filter=${filter}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setMessages(res.data.messages);
             } else {
-                const res = await axios.get(`http://localhost:3334/api/admin/reports`, {
+                const res = await axios.get(`${API_URL}/api/admin/reports`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setReports(res.data.reports);
@@ -40,7 +42,7 @@ const AdminContent = () => {
         if (!window.confirm("Delete this message for security/moderation purposes?")) return;
         const token = localStorage.getItem('token');
         try {
-            await axios.delete(`http://localhost:3334/api/admin/messages/${id}`, {
+            await axios.delete(`${API_URL}/api/admin/messages/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             fetchContent();

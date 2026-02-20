@@ -3,6 +3,8 @@ import axios from "axios";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Loader2, AlertCircle, CheckCircle2, ArrowLeft, MessageCircle } from "lucide-react";
+import { API_URL } from "../config/api";
+
 
 function ForgotPassword() {
     const [email, setEmail] = useState("");
@@ -15,7 +17,7 @@ function ForgotPassword() {
         setLoading(true);
         setError("");
 
-        axios.post("http://localhost:3334/api/forgotpassword", { email })
+        axios.post(`${API_URL}/api/forgotpassword`, { email })
             .then(() => setSuccess(true))
             .catch(err => setError(err.response?.data?.message || "Something went wrong"))
             .finally(() => setLoading(false));

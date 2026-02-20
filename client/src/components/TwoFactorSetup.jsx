@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { API_URL } from "../config/api";
+
 
 function TwoFactorSetup() {
     const [qr, setQr] = useState("");
@@ -12,7 +14,7 @@ function TwoFactorSetup() {
     useEffect(() => {
         const fetchQRCode = async () => {
             try {
-                const res = await axios.post("http://localhost:3334/api/2fa/setup", {}, {
+                const res = await axios.post(`${API_URL}/api/2fa/setup`, {}, {
                     headers: {
                         Authorization: `Bearer ${localStorage.getItem("token")}`,
                     },
@@ -34,7 +36,7 @@ function TwoFactorSetup() {
 
         try {
             const res = await axios.post(
-                "http://localhost:3334/api/2fa/verify",
+                `${API_URL}/api/2fa/verify`,
                 { token: otp },
                 {
                     headers: {

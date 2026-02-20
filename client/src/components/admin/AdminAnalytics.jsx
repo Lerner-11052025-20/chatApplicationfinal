@@ -5,6 +5,8 @@ import {
     ScatterChart, Scatter, ZAxis
 } from 'recharts';
 import { TrendingUp, Activity, Users, Flame } from 'lucide-react';
+import { API_URL } from "../../config/api";
+
 
 const AdminAnalytics = () => {
     const [heatmap, setHeatmap] = useState([]);
@@ -17,8 +19,8 @@ const AdminAnalytics = () => {
             const headers = { Authorization: `Bearer ${token}` };
             try {
                 const [h, tu] = await Promise.all([
-                    axios.get('http://localhost:3334/api/admin/analytics/heatmap', { headers }),
-                    axios.get('http://localhost:3334/api/admin/analytics/most-active-users', { headers }),
+                    axios.get(`${API_URL}/api/admin/analytics/heatmap`, { headers }),
+                    axios.get(`${API_URL}/api/admin/analytics/most-active-users`, { headers }),
                 ]);
                 setHeatmap(h.data);
                 setTopUsers(tu.data);
