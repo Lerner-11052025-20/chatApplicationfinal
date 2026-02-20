@@ -6,9 +6,9 @@ const ChatList = ({ chats, onSelect, currentUser }) => {
   const seenPartners = new Set(); // To track displayed partners
 
   return (
-    <div className="sidebar">
-      <h3 style={{marginTop:0}}>Your chats</h3>
-      <ul className="list">
+    <div>
+      <h3>Your chats</h3>
+      <ul>
         {chats.map((chat) => {
           if (!chat.users || !Array.isArray(chat.users)) return null;
 
@@ -22,7 +22,6 @@ const ChatList = ({ chats, onSelect, currentUser }) => {
             <li
               key={chat._id}
               onClick={() => onSelect(chat)}
-              className="list-item"
             >
               {partner.username || "Unknown User"}
             </li>

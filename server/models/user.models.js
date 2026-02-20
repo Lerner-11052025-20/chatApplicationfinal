@@ -2,34 +2,57 @@ import mongoose from 'mongoose'
 import bcrypt from 'bcryptjs'
 
 const userSchema = new mongoose.Schema({
-    username:{
+    username: {
         type: String,
         unique: true,
         lowercase: true,
         required: true
     },
-    email:{
+    email: {
         type: String,
         unique: true,
         lowercase: true,
         required: true
     },
-    password:{
+    password: {
         type: String,
         required: true
     },
     isVerified: {
         type: Boolean,
         default: false,
-      },
+    },
     resetPasswordToken: String,
-    resetPasswordExpires: Date
-      
-}, {timestamps: true})
+    resetPasswordExpires: Date,
+    lastSeen: {
+        type: Date,
+        default: Date.now
+    },
+    role: {
+        type: String,
+        enum: ['user', 'admin'],
+        default: 'user'
+    },
+    isBanned: {
+        type: Boolean,
+        default: false
+    },
+    bannedAt: Date,
+    bannedReason: String,
+    blockedUsers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
+    blockedBy: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
+    verifiedAt: Date,
+}, { timestamps: true })
 
-userSchema.pre("save", async function (next){
+userSchema.pre("save", async function (next) {
     // only hash if it's new or modified
-    if(!this.isModified("password")) return next();     
+    if (!this.isModified("password")) return next();
 
     try {
         const salt = await bcrypt.genSalt(10);

@@ -1,27 +1,41 @@
-import React from 'react'
-import {useNavigate} from 'react-router'
-import { NavLink } from 'react-router-dom'
+import React from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { MessageCircle, Heart } from "lucide-react";
+import Navbar from "./layout/Navbar";
+import Hero from "./home/Hero";
+import Features from "./home/Features";
+import Pricing from "./home/Pricing";
+import Testimonials from "./home/Testimonials";
+import Team from "./home/Team";
+import Stats from "./home/Stats";
+import FAQ from "./home/FAQ";
+import CallToAction from "./home/CallToAction";
+
+import Footer from "./layout/Footer";
 
 function Home() {
-  const navigate = useNavigate()
-  const signup = (e)=>{
-    navigate('/signup')
-  }
-  const login = (e)=>{
-    navigate('/login')
-  }
+  const navigate = useNavigate();
+  const token = localStorage.getItem("token");
+
   return (
-    <div className="center-screen">
-      <div className="card hero">
-        <h1 className="title">Welcome to ChatSystem</h1>
-        <p className="muted">Secure chat with a clean, modern interface. Login or create an account to get started.</p>
-        <div className="btn-group" style={{justifyContent:'center', marginTop: 16}}>
-          <button className="btn btn-primary" onClick={login}>Log In</button>
-          <button className="btn btn-ghost" onClick={signup}>Sign Up</button>
-        </div>
-      </div>
+    <div className="bg-dark-bg min-h-screen font-sans selection:bg-blue-500/30 overflow-x-hidden">
+      <Navbar />
+
+      <main className="relative z-10">
+        <div id="hero"><Hero /></div>
+        <Stats />
+        <Features />
+        <Pricing />
+        <Testimonials />
+        <Team />
+        <FAQ />
+        <div id="contact"><CallToAction /></div>
+      </main>
+
+      <Footer />
     </div>
-  )
+  );
 }
 
-export default Home
+export default Home;
