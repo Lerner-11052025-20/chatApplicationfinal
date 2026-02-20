@@ -1,42 +1,109 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import io from "socket.io-client";
 import ChatWindow from "./ChatWindow";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+	LogOut, Search, MessageCircle, User, Settings,
+	Edit, Loader2, X, Shield, Plus, MoreHorizontal,
+	ChevronRight, Activity, Zap, Compass, Sparkles,
+	Ghost
+} from "lucide-react";
+import { API_BASE_URL } from "../config";
 
+/* ─── JWT helper ─── */
 function parseJwt(token) {
 	if (!token) return null;
 	try {
-		const base64Url = token.split('.')[1];
-		const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+		const base64Url = token.split(".")[1];
+		const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
 		const jsonPayload = decodeURIComponent(
 			atob(base64)
-				.split('')
-				.map(function (c) {
-					return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-				})
-				.join('')
+				.split("")
+				.map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+				.join("")
 		);
 		return JSON.parse(jsonPayload);
-	} catch (e) {
-		return null;
-	}
+	} catch (e) { return null; }
 }
-import { motion, AnimatePresence } from "framer-motion";
-import {
-	LogOut,
-	RefreshCw,
-	Search,
-	MessageCircle,
-	User,
-	Settings,
-	ChevronLeft,
-	Edit,
-	Loader2
-} from "lucide-react";
 
-import { API_BASE_URL } from "../config";
+/* ─── Framer variants ─── */
+const containerVariants = {
+	hidden: { opacity: 0 },
+	visible: {
+		opacity: 1,
+		transition: { staggerChildren: 0.1, delayChildren: 0.2 }
+	}
+};
 
+const itemVariants = {
+	hidden: { opacity: 0, x: -20 },
+	visible: {
+		opacity: 1, x: 0,
+		transition: { type: "spring", stiffness: 300, damping: 24 }
+	}
+};
+
+/* ─── Nav items ─── */
+const NAV_ITEMS = [
+	{ icon: MessageCircle, id: "chats", label: "Chats", color: "#3b82f6" },
+	{ icon: Compass, id: "explore", label: "Explore", color: "#8b5cf6" },
+	{ icon: Shield, id: "privacy", label: "Privacy", color: "#ec4899" },
+	{ icon: Settings, id: "settings", label: "Settings", color: "#f59e0b" },
+];
+
+/* ─── Avatar ─── */
+const UserAvatar = ({ username, isActive, isOnline, size = "md", isTyping }) => {
+	const gradients = [
+		"from-blue-600 to-indigo-600",
+		"from-violet-600 to-purple-600",
+		"from-emerald-500 to-teal-600",
+		"from-rose-500 to-pink-600",
+		"from-amber-500 to-orange-600",
+	];
+	const idx = username?.charCodeAt(0) % gradients.length || 0;
+	const sz = size === "lg" ? "w-14 h-14 text-xl" : "w-11 h-11 text-base";
+
+	return (
+		<div className="relative flex-shrink-0">
+			<motion.div
+				whileHover={{ scale: 1.05 }}
+				className={`relative ${sz} rounded-2xl flex items-center justify-center font-black border overflow-hidden shadow-2xl transition-all duration-300 bg-gradient-to-tr ${gradients[idx]} ${isActive ? "border-white/40 ring-4 ring-blue-500/20" : "border-white/10"
+					}`}
+			>
+				{/* Inner glow */}
+				<div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
+				<span className="relative z-10 text-white drop-shadow-md">
+					{username?.[0]?.toUpperCase()}
+				</span>
+			</motion.div>
+
+			<AnimatePresence>
+				{isOnline && (
+					<motion.div
+						initial={{ scale: 0 }}
+						animate={{ scale: 1 }}
+						exit={{ scale: 0 }}
+						className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-[#030014] z-20"
+						style={{ boxShadow: '0 0 12px rgba(16,185,129,0.5)' }}
+					/>
+				)}
+			</AnimatePresence>
+
+			{isTyping && (
+				<div className="absolute -top-1 -right-1 flex gap-0.5">
+					<motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 0.6 }} className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+					<motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }} className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+				</div>
+			)}
+		</div>
+	);
+};
+
+/* ═══════════════════════════════════════════
+   DASHBOARD
+   ═══════════════════════════════════════════ */
 function Dashboard() {
 	const [user, setUser] = useState(null);
 	const [userList, setUserList] = useState([]);
@@ -48,95 +115,32 @@ function Dashboard() {
 	const [mobileShowChat, setMobileShowChat] = useState(false);
 	const [onlineUserIds, setOnlineUserIds] = useState([]);
 	const [pinnedMessages, setPinnedMessages] = useState([]);
+	const [activeTab, setActiveTab] = useState("chats");
+	const [tooltip, setTooltip] = useState(null);
 	const navigate = useNavigate();
-
 	const socketRef = useRef(null);
 
-	const logOut = () => {
+	/* ─── Logout ─── */
+	const logOut = useCallback(() => {
 		localStorage.removeItem("token");
 		navigate("/login");
-	};
-
-	useEffect(() => {
-		const fetchData = async () => {
-			const token = localStorage.getItem("token");
-			if (!token) return navigate("/login");
-
-			try {
-				const decoded = parseJwt(token);
-				setUser({
-					_id: decoded.id,
-					username: decoded.username,
-					email: decoded.email,
-				});
-				const socket = io(API_BASE_URL, { auth: { token } });
-				socketRef.current = socket;
-				socket.on("connect", () => {
-					if (socketRef.current && decoded.id) socketRef.current.emit("joinChat", decoded.id);
-				});
-			} catch (err) {
-				navigate("/login");
-			}
-		};
-
-		fetchData();
-
-		return () => {
-			if (socketRef.current) {
-				socketRef.current.disconnect();
-				socketRef.current = null;
-			}
-		};
 	}, [navigate]);
 
-	const fetchUser = async () => {
-		if (!user) return;
-		try {
-			const token = localStorage.getItem("token");
-			const res = await axios.get(`${API_BASE_URL}/api/users`, {
-				headers: { Authorization: `Bearer ${token}` },
-			});
-			setUserList(res.data.users.map(u => ({
-				...u,
-				hasNew: false,
-				lastMessage: null,
-				isOnline: onlineUserIds.some(id => String(id) === String(u._id))
-			})));
-		} catch (error) {
-			console.log(error);
-		}
-	};
+	/* ─── Socket Events ─── */
+	const setupSocketEvents = useCallback((socket, decodedId) => {
+		socket.on("connect", () => {
+			socket.emit("joinChat", decodedId);
+		});
 
-	useEffect(() => {
-		if (user) fetchUser();
-	}, [user]);
-
-	const getChats = async (id) => {
-		setActiveUserId(id);
-		setUserList(prev => prev.map(u => u._id === id ? { ...u, hasNew: false } : u));
-		const token = localStorage.getItem("token");
-		try {
-			const res = await axios.get(`${API_BASE_URL}/api/chats/${id}`, {
-				headers: { Authorization: `Bearer ${token}` },
-			});
-			setSelectedChat(res.data.chat);
-			setMobileShowChat(true);
-		} catch (err) {
-			console.error("Failed to fetch chats:", err);
-		}
-	};
-
-	useEffect(() => {
-		const socket = socketRef.current;
-		if (!socket) return;
-
-		const handleChatUpdated = ({ chatId, lastMessage, from }) => {
-			const otherId = (from && from !== user?._id) ? from : activeUserId;
+		socket.on("chatUpdated", ({ chatId, lastMessage, from }) => {
+			const otherId = from && from !== decodedId ? from : activeUserId;
 			if (!otherId) return;
 
-			setUserList(prev => {
-				const updated = prev.map(u => u._id === otherId ? { ...u, lastMessage, hasNew: (from !== user?._id) } : u);
-				const foundIndex = updated.findIndex(u => u._id === otherId);
+			setUserList((prev) => {
+				const updated = prev.map((u) =>
+					u._id === otherId ? { ...u, lastMessage, hasNew: from !== decodedId } : u
+				);
+				const foundIndex = updated.findIndex((u) => u._id === otherId);
 				if (foundIndex > 0) {
 					const [item] = updated.splice(foundIndex, 1);
 					return [item, ...updated];
@@ -145,450 +149,579 @@ function Dashboard() {
 			});
 
 			if (selectedChat && selectedChat._id === chatId) {
-				setMessages(prev => (prev.find(m => m._id === lastMessage._id) ? prev : [...prev, lastMessage]));
+				setMessages((prev) =>
+					prev.find((m) => m._id === lastMessage._id) ? prev : [...prev, lastMessage]
+				);
 			}
-		};
-
-		socket.on('chatUpdated', handleChatUpdated);
-
-		socket.on('error', (err) => {
-			alert(err.message);
 		});
 
-		return () => {
-			socket.off('chatUpdated', handleChatUpdated);
-			socket.off('error');
-		};
-
-		return () => {
-			socket.off('chatUpdated', handleChatUpdated);
-		};
-	}, [user, activeUserId, selectedChat]);
-
-	useEffect(() => {
-		if (!selectedChat) return;
-		const socket = socketRef.current;
-		if (socket) socket.emit("joinChat", selectedChat._id);
-
-		const token = localStorage.getItem("token");
-
-		// Fetch messages
-		axios
-			.get(`${API_BASE_URL}/api/messages/${selectedChat._id}`, {
-				headers: { Authorization: `Bearer ${token}` },
-			})
-			.then((res) => setMessages(res.data))
-			.catch((err) => console.error("Failed to fetch messages:", err));
-
-		// Fetch pinned messages for this chat
-		axios
-			.get(`${API_BASE_URL}/api/pinned/${selectedChat._id}`, {
-				headers: { Authorization: `Bearer ${token}` },
-			})
-			.then((res) => setPinnedMessages(res.data))
-			.catch((err) => console.error("Failed to fetch pinned messages:", err));
-	}, [selectedChat]);
-
-	useEffect(() => {
-		const socket = socketRef.current;
-		if (!socket) return;
-
-		const handleReceive = (msg) => {
+		socket.on("receiveMessage", (msg) => {
 			setMessages((prev) => (prev.find((m) => m._id === msg._id) ? prev : [...prev, msg]));
-
 			const senderId = msg.sender?._id || msg.sender;
-			const isVisible = document.visibilityState === 'visible';
 			const isSameChat = selectedChat && selectedChat._id === msg.chatId;
-
-			if (user && senderId !== user._id) {
-				// Mark as seen/delivered
+			if (senderId !== decodedId) {
 				socket.emit("updateStatus", {
 					messageIds: [msg._id],
 					status: isSameChat ? "seen" : "delivered",
 					chatId: msg.chatId,
 				});
-
-				// No sound/toast logic
 			}
-		};
+		});
 
-		const handleStatus = ({ messageIds, status, chatId }) => {
+		socket.on("statusUpdated", ({ messageIds, status, chatId }) => {
 			if (selectedChat && selectedChat._id === chatId) {
-				setMessages((prev) => prev.map((m) => (messageIds.includes(m._id) ? { ...m, status } : m)));
+				setMessages((prev) =>
+					prev.map((m) => (messageIds.includes(m._id) ? { ...m, status } : m))
+				);
 			}
-		};
+		});
 
-		const handleOnlineUsersList = (ids) => {
+		socket.on("onlineUsersList", (ids) => {
 			setOnlineUserIds(ids);
-			setUserList(prev => prev.map(u => ({ ...u, isOnline: ids.some(id => String(id) === String(u._id)) })));
-		};
+			setUserList((prev) =>
+				prev.map((u) => ({ ...u, isOnline: ids.some((id) => String(id) === String(u._id)) }))
+			);
+		});
 
-		const handleUserStatusChanged = ({ userId, status, lastSeen }) => {
-			setOnlineUserIds(prev => {
-				if (status === "online") {
-					return prev.some(id => String(id) === String(userId)) ? prev : [...prev, userId];
-				} else {
-					return prev.filter(id => String(id) !== String(userId));
-				}
-			});
-			setUserList(prev => prev.map(u => String(u._id) === String(userId) ? { ...u, isOnline: status === "online", lastSeen: status === "offline" ? lastSeen : u.lastSeen } : u));
-		};
+		socket.on("userStatusChanged", ({ userId, status, lastSeen }) => {
+			setOnlineUserIds((prev) =>
+				status === "online"
+					? prev.some((id) => String(id) === String(userId)) ? prev : [...prev, userId]
+					: prev.filter((id) => String(id) !== String(userId))
+			);
+			setUserList((prev) =>
+				prev.map((u) =>
+					String(u._id) === String(userId)
+						? { ...u, isOnline: status === "online", lastSeen: status === "offline" ? lastSeen : u.lastSeen }
+						: u
+				)
+			);
+		});
 
-		const handleTyping = ({ chatId, userId }) => {
-			if (userId === user?._id) return;
-			setTypingUsers(prev => ({
+		socket.on("typing", ({ chatId, userId }) => {
+			if (userId === decodedId) return;
+			setTypingUsers((prev) => ({
 				...prev,
-				[chatId]: [...(prev[chatId] || []).filter(id => id !== userId), userId]
+				[chatId]: [...(prev[chatId] || []).filter((id) => id !== userId), userId],
 			}));
-		};
+		});
 
-		const handleStopTyping = ({ chatId, userId }) => {
-			setTypingUsers(prev => ({
+		socket.on("stopTyping", ({ chatId, userId }) => {
+			setTypingUsers((prev) => ({
 				...prev,
-				[chatId]: (prev[chatId] || []).filter(id => id !== userId)
+				[chatId]: (prev[chatId] || []).filter((id) => id !== userId),
 			}));
-		};
+		});
 
-		const handleMessageEdited = ({ messageId, newContent, chatId, editedAt }) => {
+		socket.on("messageEdited", ({ messageId, newContent, chatId, editedAt }) => {
+			if (selectedChat && selectedChat._id === chatId)
+				setMessages((prev) =>
+					prev.map((m) =>
+						m._id === messageId ? { ...m, content: newContent, isEdited: true, editedAt } : m
+					)
+				);
+		});
+
+		socket.on("messageDeleted", ({ messageId, chatId, isDeleted, isDeletedForMe }) => {
 			if (selectedChat && selectedChat._id === chatId) {
-				setMessages(prev => prev.map(m => m._id === messageId ? { ...m, content: newContent, isEdited: true, editedAt } : m));
+				if (isDeleted)
+					setMessages((prev) =>
+						prev.map((m) =>
+							m._id === messageId ? { ...m, content: "This message was deleted", isDeleted: true } : m
+						)
+					);
+				else if (isDeletedForMe)
+					setMessages((prev) => prev.filter((m) => m._id !== messageId));
+			}
+		});
+
+		socket.on("reactionUpdated", ({ messageId, reactions, chatId }) => {
+			if (selectedChat && selectedChat._id === chatId)
+				setMessages((prev) =>
+					prev.map((m) => (m._id === messageId ? { ...m, reactions } : m))
+				);
+		});
+
+		socket.on("messagePinned", ({ chatId, message }) => {
+			if (selectedChat && selectedChat._id === chatId) {
+				setMessages((prev) =>
+					prev.map((m) =>
+						m._id === message._id
+							? { ...m, isPinned: true, pinnedBy: message.pinnedBy, pinnedAt: message.pinnedAt }
+							: m
+					)
+				);
+				setPinnedMessages((prev) => [
+					message,
+					...prev.filter((p) => String(p._id) !== String(message._id)),
+				]);
+			}
+		});
+
+		socket.on("messageUnpinned", ({ chatId, messageId }) => {
+			if (selectedChat && selectedChat._id === chatId) {
+				setMessages((prev) =>
+					prev.map((m) =>
+						String(m._id) === String(messageId)
+							? { ...m, isPinned: false, pinnedBy: null, pinnedAt: null }
+							: m
+					)
+				);
+				setPinnedMessages((prev) => prev.filter((p) => String(p._id) !== String(messageId)));
+			}
+		});
+
+		socket.on("error", (err) => console.error("Socket error:", err));
+	}, [selectedChat, activeUserId]);
+
+	/* ─── Init ─── */
+	useEffect(() => {
+		const init = async () => {
+			const token = localStorage.getItem("token");
+			if (!token) return navigate("/login");
+			try {
+				const decoded = parseJwt(token);
+				setUser({ _id: decoded.id, username: decoded.username, email: decoded.email });
+				const socket = io(API_BASE_URL, { auth: { token } });
+				socketRef.current = socket;
+				setupSocketEvents(socket, decoded.id);
+			} catch (e) {
+				localStorage.removeItem("token");
+				navigate("/login");
 			}
 		};
-
-		const handleMessageDeleted = ({ messageId, chatId, isDeleted, isDeletedForMe }) => {
-			if (selectedChat && selectedChat._id === chatId) {
-				if (isDeleted) {
-					// Delete for Everyone
-					setMessages(prev => prev.map(m => m._id === messageId ? { ...m, content: "This message was deleted", isDeleted: true } : m));
-				} else if (isDeletedForMe) {
-					// Delete for Me
-					setMessages(prev => prev.filter(m => m._id !== messageId));
-				}
-			}
-		};
-
-		const handleReactionUpdated = ({ messageId, reactions, chatId }) => {
-			if (selectedChat && selectedChat._id === chatId) {
-				setMessages(prev => prev.map(m => m._id === messageId ? { ...m, reactions } : m));
-			}
-		};
-
-		const handleMessagePinned = ({ chatId, message }) => {
-			if (selectedChat && selectedChat._id === chatId) {
-				// Update the message in the list to mark isPinned
-				setMessages(prev => prev.map(m => m._id === message._id ? { ...m, isPinned: true, pinnedBy: message.pinnedBy, pinnedAt: message.pinnedAt } : m));
-				// Add to pinnedMessages (deduplicated)
-				setPinnedMessages(prev => [message, ...prev.filter(p => String(p._id) !== String(message._id))]);
-			}
-		};
-
-		const handleMessageUnpinned = ({ chatId, messageId }) => {
-			if (selectedChat && selectedChat._id === chatId) {
-				setMessages(prev => prev.map(m => String(m._id) === String(messageId) ? { ...m, isPinned: false, pinnedBy: null, pinnedAt: null } : m));
-				setPinnedMessages(prev => prev.filter(p => String(p._id) !== String(messageId)));
-			}
-		};
-
-		socket.on("receiveMessage", handleReceive);
-		socket.on("statusUpdated", handleStatus);
-		socket.on("onlineUsersList", handleOnlineUsersList);
-		socket.on("userStatusChanged", handleUserStatusChanged);
-		socket.on("typing", handleTyping);
-		socket.on("stopTyping", handleStopTyping);
-		socket.on("messageEdited", handleMessageEdited);
-		socket.on("messageDeleted", handleMessageDeleted);
-		socket.on("reactionUpdated", handleReactionUpdated);
-		socket.on("messagePinned", handleMessagePinned);
-		socket.on("messageUnpinned", handleMessageUnpinned);
-
+		init();
 		return () => {
-			socket.off("receiveMessage", handleReceive);
-			socket.off("statusUpdated", handleStatus);
-			socket.off("onlineUsersList", handleOnlineUsersList);
-			socket.off("userStatusChanged", handleUserStatusChanged);
-			socket.off("typing", handleTyping);
-			socket.off("stopTyping", handleStopTyping);
-			socket.off("messageEdited", handleMessageEdited);
-			socket.off("messageDeleted", handleMessageDeleted);
-			socket.off("reactionUpdated", handleReactionUpdated);
-			socket.off("messagePinned", handleMessagePinned);
-			socket.off("messageUnpinned", handleMessageUnpinned);
+			if (socketRef.current) { socketRef.current.disconnect(); socketRef.current = null; }
 		};
-	}, [user, selectedChat]);
+	}, [navigate, setupSocketEvents]);
+
+	/* ─── Fetch data ─── */
+	const fetchUsers = useCallback(async () => {
+		if (!user) return;
+		try {
+			const token = localStorage.getItem("token");
+			const res = await axios.get(`${API_BASE_URL}/api/users`, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
+			setUserList(
+				res.data.users.map((u) => ({
+					...u,
+					hasNew: false,
+					lastMessage: null,
+					isOnline: onlineUserIds.some((id) => String(id) === String(u._id)),
+				}))
+			);
+		} catch (error) { console.error("Fetch users failed:", error); }
+	}, [user, onlineUserIds]);
+
+	useEffect(() => { if (user) fetchUsers(); }, [user, fetchUsers]);
+
+	/* ─── Chat Actions ─── */
+	const getChats = useCallback(async (id) => {
+		setActiveUserId(id);
+		setUserList((prev) => prev.map((u) => (u._id === id ? { ...u, hasNew: false } : u)));
+		const token = localStorage.getItem("token");
+		try {
+			const res = await axios.get(`${API_BASE_URL}/api/chats/${id}`, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
+			setSelectedChat(res.data.chat);
+			setMobileShowChat(true);
+		} catch (err) { console.error("Failed to fetch chats:", err); }
+	}, []);
 
 	useEffect(() => {
-		if (selectedChat && messages.length > 0 && socketRef.current) {
-			const unseenMessageIds = messages.filter((m) => m.sender !== user._id && m.status !== "seen").map((m) => m._id);
+		if (!selectedChat) return;
+		const token = localStorage.getItem("token");
+		const headers = { Authorization: `Bearer ${token}` };
 
-			if (unseenMessageIds.length > 0) {
-				socketRef.current.emit("updateStatus", {
-					messageIds: unseenMessageIds,
-					status: "seen",
-					chatId: selectedChat._id,
-				});
-			}
-		}
-	}, [selectedChat, messages, user]);
+		axios.get(`${API_BASE_URL}/api/messages/${selectedChat._id}`, { headers })
+			.then((res) => setMessages(res.data));
+		axios.get(`${API_BASE_URL}/api/pinned/${selectedChat._id}`, { headers })
+			.then((res) => setPinnedMessages(res.data));
+	}, [selectedChat]);
 
-	const handleSendMessage = (content, parentMessageId) => {
-		if (socketRef.current) {
-			socketRef.current.emit("sendMessage", { chatId: selectedChat._id, content, parentMessageId });
-		}
-	};
+	/* ─── Message management ─── */
+	const handleSendMessage = useCallback((content, parentMessageId) => {
+		socketRef.current?.emit("sendMessage", { chatId: selectedChat._id, content, parentMessageId });
+	}, [selectedChat]);
 
-	const handleBlock = async (targetId) => {
+	const handleBlock = useCallback(async (targetId) => {
 		try {
 			const token = localStorage.getItem("token");
-			const res = await axios.post(`${API_BASE_URL}/api/user/block`, { targetUserId: targetId }, {
-				headers: { Authorization: `Bearer ${token}` }
-			});
-			// Update local state
-			setUserList(prev => prev.filter(u => u._id !== targetId));
-			setSelectedChat(null);
-			setMobileShowChat(false);
-			alert("User blocked successfully");
-		} catch (err) {
-			alert(err.response?.data?.message || "Failed to block user");
-		}
-	};
+			await axios.post(`${API_BASE_URL}/api/user/block`, { targetUserId: targetId }, { headers: { Authorization: `Bearer ${token}` } });
+			setUserList((prev) => prev.filter((u) => u._id !== targetId));
+			setSelectedChat(null); setMobileShowChat(false);
+		} catch (err) { alert(err.response?.data?.message || "Block failed"); }
+	}, []);
 
-	const handleUnblock = async (targetId) => {
+	const handleUnblock = useCallback(async (targetId) => {
 		try {
 			const token = localStorage.getItem("token");
-			await axios.post(`${API_BASE_URL}/api/user/unblock`, { targetUserId: targetId }, {
-				headers: { Authorization: `Bearer ${token}` }
-			});
-			fetchUser(); // Refresh list to maybe show them again if they weren't blocked by other criteria
-			alert("User unblocked successfully");
-		} catch (err) {
-			alert("Failed to unblock user");
-		}
-	};
+			await axios.post(`${API_BASE_URL}/api/user/unblock`, { targetUserId: targetId }, { headers: { Authorization: `Bearer ${token}` } });
+			fetchUsers();
+		} catch { alert("Unblock failed"); }
+	}, [fetchUsers]);
 
-	const handleReport = async (targetId, reason, description) => {
+	const handleReport = useCallback(async (targetId, reason, description) => {
 		try {
 			const token = localStorage.getItem("token");
-			await axios.post(`${API_BASE_URL}/api/report`, { reportedUserId: targetId, reason, description }, {
-				headers: { Authorization: `Bearer ${token}` }
-			});
-			alert("Report submitted successfully");
-		} catch (err) {
-			alert("Failed to submit report");
-		}
-	};
+			await axios.post(`${API_BASE_URL}/api/report`, { reportedUserId: targetId, reason, description }, { headers: { Authorization: `Bearer ${token}` } });
+		} catch { alert("Report failed"); }
+	}, []);
 
-	const handleEditMessage = (msgId, newContent) => {
+	const handleEditMessage = useCallback((msgId, newContent) => {
 		socketRef.current?.emit("editMessage", { messageId: msgId, newContent, chatId: selectedChat._id });
-	};
+	}, [selectedChat]);
 
-	const handleDeleteMessage = (msgId) => {
-		socketRef.current?.emit("deleteMessage", { messageId: msgId, chatId: selectedChat._id });
-	};
+	const handleDeleteMessage = useCallback((msgId, deleteType = "everyone") => {
+		socketRef.current?.emit("deleteMessage", { messageId: msgId, chatId: selectedChat._id, deleteType });
+	}, [selectedChat]);
 
-	const handleReact = (msgId, emoji) => {
+	const handleReact = useCallback((msgId, emoji) => {
 		socketRef.current?.emit("toggleReaction", { messageId: msgId, emoji, chatId: selectedChat._id });
-	};
+	}, [selectedChat]);
 
-	const handlePin = (msgId) => {
+	const handlePin = useCallback((msgId) => {
 		socketRef.current?.emit("pinMessage", { messageId: msgId, chatId: selectedChat._id });
-	};
+	}, [selectedChat]);
 
-	const handleUnpin = (msgId) => {
+	const handleUnpin = useCallback((msgId) => {
 		socketRef.current?.emit("unpinMessage", { messageId: msgId, chatId: selectedChat._id });
-	};
+	}, [selectedChat]);
 
-	const filteredUsers = userList.filter(u =>
-		String(u._id) !== String(user?._id) &&
-		u.username.toLowerCase().includes(searchQuery.toLowerCase())
+	/* ─── Filtering ─── */
+	const filteredUsers = useMemo(
+		() => userList.filter(u =>
+			String(u._id) !== String(user?._id) &&
+			u.username.toLowerCase().includes(searchQuery.toLowerCase())
+		), [userList, user, searchQuery]
 	);
 
+	const onlineCount = useMemo(() => filteredUsers.filter(u => u.isOnline).length, [filteredUsers]);
+
+	/* ─── Loading phase ─── */
 	if (!user) return (
-		<div>
-			<Loader2 />
+		<div className="h-screen w-screen bg-[#030014] flex flex-col items-center justify-center relative overflow-hidden">
+			<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/10 blur-[120px] rounded-full animate-pulse" />
+			<motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+				<div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center shadow-emerald-500/20 shadow-2xl mb-6">
+					<MessageCircle size={36} className="text-white fill-white/10" />
+				</div>
+				<div className="flex items-center gap-3 text-gray-500 font-bold uppercase tracking-widest text-[10px]">
+					<Loader2 size={14} className="animate-spin text-blue-500" /> accessing messenger...
+				</div>
+			</motion.div>
 		</div>
 	);
 
 	return (
-		<div className="flex h-screen bg-dark-bg text-white overflow-hidden font-sans">
-			{/* ========== INTEGRATED SIDEBAR ========== */}
-			<aside className="w-20 lg:w-24 flex flex-col items-center py-8 border-r border-white/5 bg-dark-bg/50 backdrop-blur-2xl z-20">
-				<div className="mb-12">
-					<div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-						<MessageCircle size={24} className="text-white fill-white/20" />
-					</div>
-				</div>
+		<div className="flex h-screen bg-[#030014] text-white overflow-hidden font-sans relative">
+			{/* ── Background accents ── */}
+			<div className="pointer-events-none absolute inset-0 z-0">
+				<div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/5 blur-[120px] rounded-full" />
+				<div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600/5 blur-[120px] rounded-full" />
+			</div>
 
-				{/* No In-App Toast Notification */}
+			{/* ════════════════════════════════════
+				 CYBER SIDEBAR
+			════════════════════════════════════ */}
+			<motion.aside
+				initial={{ x: -80 }}
+				animate={{ x: 0 }}
+				className="relative w-[80px] flex flex-col items-center py-8 border-r border-white/5 z-20 flex-shrink-0 bg-black/40 backdrop-blur-3xl"
+			>
+				{/* Logo */}
+				<motion.div
+					whileHover={{ scale: 1.1, rotate: 8 }}
+					className="mb-10 w-12 h-12 rounded-[1.25rem] bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center shadow-2xl shadow-blue-500/20 cursor-pointer"
+					onClick={() => navigate("/")}
+				>
+					<MessageCircle size={24} className="text-white" />
+				</motion.div>
 
-				<nav className="flex-1 flex flex-col gap-8">
-					{[
-						{ icon: MessageCircle, id: 'chats', active: true },
-						{ icon: User, id: 'contacts' },
-						{ icon: Search, id: 'search' },
-						{ icon: Settings, id: 'settings' },
-					].map((item) => (
-						<motion.button
-							key={item.id}
-							whileHover={{ scale: 1.1 }}
-							whileTap={{ scale: 0.9 }}
-							onClick={() => item.id === 'settings' ? navigate('/blocked') : null}
-							className={`p-3 rounded-2xl transition-all ${item.active
-								? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
-								: 'text-gray-500 hover:text-white hover:bg-white/5'
-								}`}
-						>
-							<item.icon size={24} />
-						</motion.button>
-					))}
+				{/* Navigation */}
+				<nav className="flex-1 flex flex-col gap-4">
+					{NAV_ITEMS.map((item) => {
+						const active = activeTab === item.id;
+						return (
+							<div key={item.id} className="relative group flex justify-center py-1">
+								{active && (
+									<motion.div
+										layoutId="sidePill"
+										className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-r-full shadow-[0_0_12px_rgba(59,130,246,0.6)]"
+									/>
+								)}
+								<motion.button
+									whileHover={{ scale: 1.1 }}
+									whileTap={{ scale: 0.9 }}
+									onClick={() => {
+										setActiveTab(item.id);
+										if (["settings", "privacy"].includes(item.id)) navigate("/blocked");
+										if (item.id === "contacts") navigate("/profile");
+									}}
+									className={`p-3.5 rounded-2xl transition-all duration-300 relative ${active
+										? "bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-blue-500/5"
+										: "text-gray-500 hover:text-white"
+										}`}
+								>
+									<item.icon size={22} strokeWidth={active ? 2.5 : 2} />
+									{active && (
+										<motion.div
+											layoutId="glow"
+											className="absolute inset-0 bg-blue-500/5 blur-lg rounded-full"
+										/>
+									)}
+								</motion.button>
+
+								{/* Tooltip */}
+								<div className="absolute left-full ml-4 px-3 py-1.5 rounded-lg bg-gray-900 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-50 translate-x-[-10px] group-hover:translate-x-0">
+									{item.label}
+								</div>
+							</div>
+						);
+					})}
 				</nav>
 
-				<div className="flex flex-col gap-6 mt-auto">
-					<motion.button
-						whileHover={{ scale: 1.1 }}
-						onClick={() => navigate('/profile')}
+				{/* Bottom Actions */}
+				<div className="mt-auto flex flex-col items-center gap-6">
+					<motion.div
 						className="relative"
+						whileHover={{ scale: 1.1 }}
+						onClick={() => navigate("/profile")}
 					>
-						<div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center border-2 border-white/10">
-							<span className="text-xs font-bold">{user?.username?.[0]?.toUpperCase()}</span>
+						<div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center p-[2px] cursor-pointer shadow-xl">
+							<div className="w-full h-full rounded-[0.9rem] bg-gray-900 flex items-center justify-center overflow-hidden border border-white/10">
+								<span className="text-sm font-black text-white">{user.username[0].toUpperCase()}</span>
+							</div>
 						</div>
-						<div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-dark-bg" title="Online" />
-					</motion.button>
+						<div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-[#030014] shadow-emerald-500/20 shadow-lg" />
+					</motion.div>
 
 					<motion.button
-						whileHover={{ scale: 1.1 }}
+						whileHover={{ scale: 1.1, color: "#ef4444" }}
 						onClick={logOut}
-						className="p-3 rounded-2xl text-gray-500 hover:text-red-400 hover:bg-red-400/10 transition-all"
+						className="p-3 text-gray-500 transition-colors"
 					>
-						<LogOut size={24} />
+						<LogOut size={20} />
 					</motion.button>
 				</div>
-			</aside>
+			</motion.aside>
 
-			{/* ========== CHAT LIST SIDEBAR ========== */}
-			<aside className={`w-80 lg:w-96 flex flex-col border-r border-white/5 bg-dark-bg/30 backdrop-blur-xl z-10 ${mobileShowChat ? 'hidden md:flex' : 'flex'}`}>
-				<div className="p-6">
-					<h2 className="text-2xl font-bold mb-6 flex items-center justify-between">
-						Chats
-						<motion.button
-							whileHover={{ rotate: 90 }}
-							className="p-2 glass rounded-lg"
-						>
-							<Edit size={18} className="text-gray-400" />
-						</motion.button>
-					</h2>
-
-					<div className="relative group">
-						<Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-400 transition-colors" size={18} />
-						<input
-							type="text"
-							placeholder="Search conversations..."
-							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
-							className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white/10 transition-all text-sm"
-						/>
-					</div>
-				</div>
-
-				<div className="flex-1 overflow-y-auto custom-scrollbar px-3 pb-6">
-					<div className="space-y-1">
-						{filteredUsers.length === 0 ? (
-							<div className="text-center py-10">
-								<p className="text-gray-500 text-sm">No users found</p>
+			{/* ════════════════════════════════════
+				 CHAT LIST PANEL
+			════════════════════════════════════ */}
+			<motion.section
+				initial={{ x: -20, opacity: 0 }}
+				animate={{ x: 0, opacity: 1 }}
+				className={`w-full md:w-[350px] lg:w-[400px] flex flex-col border-r border-white/5 bg-black/20 backdrop-blur-2xl z-10 ${mobileShowChat ? "hidden md:flex" : "flex"
+					}`}
+			>
+				{/* Top Header */}
+				<div className="p-6 pb-2">
+					<div className="flex items-center justify-between mb-6">
+						<div className="space-y-1">
+							<h2 className="text-2xl font-black text-white tracking-tight leading-none">Intelligence</h2>
+							<div className="flex items-center gap-2">
+								<Activity size={10} className="text-emerald-500" />
+								<span className="text-[10px] font-black uppercase text-gray-500 tracking-widest">
+									{onlineCount} agents active
+								</span>
 							</div>
-						) : (
-							filteredUsers.map((u) => {
-								const lastMsg = u.lastMessage;
-								const isActive = activeUserId === u._id;
+						</div>
+						<motion.button
+							whileHover={{ scale: 1.1 }}
+							whileTap={{ scale: 0.9 }}
+							className="w-10 h-10 rounded-xl bg-white/3 border border-white/6 flex items-center justify-center text-gray-400 hover:text-white hover:border-white/20 transition-all"
+						>
+							<Plus size={18} />
+						</motion.button>
+					</div>
 
-								return (
-									<motion.div
-										key={u._id}
-										initial={{ opacity: 0, x: -10 }}
-										animate={{ opacity: 1, x: 0 }}
-										onClick={() => getChats(u._id)}
-										className={`group flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${isActive
-											? 'bg-blue-600/10 border border-blue-500/20 shadow-lg shadow-blue-500/5'
-											: 'hover:bg-white/5 border border-transparent'
-											}`}
-									>
-										<div className="relative flex-shrink-0">
-											<div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold border-2 ${isActive ? 'border-blue-500/50' : 'border-white/5'
-												} bg-gradient-to-tr ${isActive ? 'from-blue-600 to-indigo-600 text-white' : 'from-gray-700 to-gray-800 text-gray-300'
-												}`}>
-												{u.username[0].toUpperCase()}
-											</div>
-											{u.isOnline && (
-												<div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-dark-bg" />
-											)}
-										</div>
-
-										<div className="flex-1 min-w-0">
-											<div className="flex justify-between items-center mb-1">
-												<span className={`font-semibold truncate ${isActive ? 'text-blue-400' : 'text-gray-200 group-hover:text-white'}`}>
-													{u.username}
-												</span>
-												<span className="text-[10px] text-gray-500 whitespace-nowrap">
-													{lastMsg ? new Date(lastMsg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-												</span>
-											</div>
-											<div className="flex justify-between items-center">
-												<p className={`text-xs truncate max-w-[140px] ${u.hasNew ? 'text-blue-400 font-bold' : 'text-gray-500'
-													}`}>
-													{Object.values(typingUsers).some(uids => uids.includes(u._id))
-														? <span className="text-blue-400 animate-pulse drop-shadow-[0_0_5px_rgba(96,165,250,0.5)]">Typing...</span>
-														: (lastMsg?.content || 'No messages yet')}
-												</p>
-												{u.hasNew && (
-													<div className="w-2 h-2 rounded-full bg-blue-500 shadow-lg shadow-blue-500/50" />
-												)}
-											</div>
-										</div>
-									</motion.div>
-								);
-							})
-						)}
+					{/* Digital Search Bar */}
+					<div className="relative group mb-4">
+						<div className="absolute inset-0 bg-blue-500/5 blur-xl group-focus-within:bg-blue-500/10 transition-all rounded-2xl" />
+						<div className="relative flex items-center bg-white/5 border border-white/6 rounded-2xl px-4 group-focus-within:border-blue-500/30 transition-all shadow-inner">
+							<Search size={16} className="text-gray-500 group-focus-within:text-blue-400 transition-colors" />
+							<input
+								type="text"
+								placeholder="Search encrypted channels..."
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+								className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-3 px-3 text-white placeholder:text-gray-600 font-medium"
+							/>
+							{searchQuery && (
+								<X size={14} className="text-gray-500 cursor-pointer" onClick={() => setSearchQuery("")} />
+							)}
+						</div>
 					</div>
 				</div>
-			</aside>
 
-			{/* ========== MAIN CHAT AREA ========== */}
-			<main className={`flex-1 relative flex flex-col bg-dark-bg/20 ${!mobileShowChat ? 'hidden md:flex' : 'flex'}`}>
+				{/* User List */}
+				<div className="flex-1 overflow-y-auto no-scrollbar px-3 space-y-1 pb-6">
+					<AnimatePresence mode="popLayout">
+						{filteredUsers.length === 0 ? (
+							<motion.div
+								key="empty"
+								initial={{ opacity: 0 }}
+								animate={{ opacity: 1 }}
+								className="flex flex-col items-center justify-center py-20 opacity-40"
+							>
+								<div className="p-4 rounded-full bg-white/2 border border-white/5 mb-4">
+									<Ghost size={32} strokeWidth={1} />
+								</div>
+								<span className="text-xs font-bold uppercase tracking-widest text-gray-600">No signals found</span>
+							</motion.div>
+						) : (
+							<motion.div
+								variants={containerVariants}
+								initial="hidden"
+								animate="visible"
+								className="space-y-1"
+							>
+								{filteredUsers.map((u) => {
+									const isActive = activeUserId === u._id;
+									const isTyping = Object.values(typingUsers).some(ids => ids.includes(u._id));
+									const lastTime = u.lastMessage ? new Date(u.lastMessage.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+
+									return (
+										<motion.div
+											key={u._id}
+											variants={itemVariants}
+											layout
+											onClick={() => getChats(u._id)}
+											className={`group relative flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-300 ${isActive
+												? "bg-blue-500/10 border border-blue-500/20 shadow-xl"
+												: "hover:bg-white/5 border border-transparent hover:border-white/5"
+												}`}
+										>
+											{isActive && (
+												<motion.div
+													layoutId="activeGlow"
+													className="absolute inset-0 bg-blue-500/5 blur-lg rounded-2xl -z-10"
+												/>
+											)}
+
+											<UserAvatar
+												username={u.username}
+												isActive={isActive}
+												isOnline={u.isOnline}
+												isTyping={isTyping}
+											/>
+
+											<div className="flex-1 min-w-0">
+												<div className="flex justify-between items-start mb-0.5">
+													<h4 className={`text-sm font-black truncate transition-colors ${isActive ? 'text-white' : 'text-gray-300 group-hover:text-white'}`}>
+														{u.username}
+													</h4>
+													<span className="text-[10px] font-black text-gray-600 uppercase tabular-nums">
+														{lastTime}
+													</span>
+												</div>
+												<div className="flex items-center justify-between gap-2">
+													<p className={`text-xs truncate transition-colors font-medium ${u.hasNew ? 'text-blue-400 font-bold' : 'text-gray-500 group-hover:text-gray-400'}`}>
+														{isTyping ? "typing signal detected..." : (u.lastMessage?.content || "No active transmission")}
+													</p>
+													{u.hasNew && (
+														<div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+													)}
+												</div>
+											</div>
+
+											{/* Subtle entry detail */}
+											<div className="absolute right-4 translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all pointer-events-none">
+												<ChevronRight size={14} className="text-gray-700" />
+											</div>
+										</motion.div>
+									)
+								})}
+							</motion.div>
+						)}
+					</AnimatePresence>
+				</div>
+			</motion.section>
+
+			{/* ════════════════════════════════════
+				 MAIN CONTENT AREA
+			════════════════════════════════════ */}
+			<main className={`flex-1 flex flex-col relative z-0 ${!mobileShowChat ? "hidden md:flex" : "flex"}`}>
 				<AnimatePresence mode="wait">
 					{!selectedChat ? (
+						/* Empty workspace view */
 						<motion.div
-							initial={{ opacity: 0, scale: 0.9 }}
+							key="empty"
+							initial={{ opacity: 0, scale: 0.98 }}
 							animate={{ opacity: 1, scale: 1 }}
-							exit={{ opacity: 0, scale: 0.9 }}
+							exit={{ opacity: 0, scale: 0.98 }}
 							className="flex-1 flex flex-col items-center justify-center p-12 text-center"
 						>
-							<div className="w-24 h-24 rounded-[2rem] bg-gradient-to-tr from-blue-500/20 to-indigo-500/20 flex items-center justify-center mb-8 border border-blue-500/10">
-								<MessageCircle size={48} className="text-blue-500" />
+							<div className="relative mb-8">
+								<motion.div
+									animate={{ scale: [1, 1.1, 1], opacity: [0.1, 0.2, 0.1] }}
+									transition={{ repeat: Infinity, duration: 4 }}
+									className="absolute inset-x-[-100px] inset-y-[-100px] bg-blue-600/10 blur-[80px] rounded-full pointer-events-none"
+								/>
+								<motion.div
+									animate={{ y: [0, -10, 0] }}
+									transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+									className="relative w-28 h-28 rounded-3xl bg-white/3 border border-white/8 backdrop-blur-xl flex items-center justify-center shadow-2xl"
+								>
+									<div className="absolute inset-0 bg-gradient-to-tr from-blue-500/10 to-indigo-500/10 rounded-3xl" />
+									<Sparkles size={48} className="text-blue-400 opacity-60" />
+								</motion.div>
+								{/* Floating accents */}
+								<motion.div animate={{ y: [0, 15, 0], x: [0, 5, 0] }} transition={{ repeat: Infinity, duration: 4 }} className="absolute -top-4 -right-4 w-8 h-8 rounded-full border border-blue-500/20 bg-blue-500/5 flex items-center justify-center text-blue-500"><Zap size={14} /></motion.div>
+								<motion.div animate={{ y: [0, -10, 0], x: [0, -8, 0] }} transition={{ repeat: Infinity, duration: 5 }} className="absolute -bottom-6 -left-2 w-10 h-10 rounded-[12px] border border-white/5 bg-white/2 flex items-center justify-center text-gray-700 font-black text-xs uppercase">Enc</motion.div>
 							</div>
-							<h2 className="text-3xl font-bold mb-4 text-white">Select a conversation</h2>
-							<p className="text-gray-500 max-w-sm">
-								Choose a person from the left menu to start chatting and sharing your world.
+
+							<h2 className="text-3xl font-black text-white mb-3 tracking-tighter">Messenger Hub</h2>
+							<p className="text-gray-500 text-sm max-w-sm font-medium leading-relaxed">
+								Select a secure channel from the sidebar to begin messaging. All transmissions are end-to-end encrypted.
 							</p>
+
+							<div className="flex gap-4 mt-10">
+								{[
+									{ l: "Secure Stack", i: Shield, c: "#3b82f6" },
+									{ l: "Nano Sync", i: Zap, c: "#f59e0b" },
+									{ l: "Vector Hub", i: Activity, c: "#10b981" }
+								].map((tag, i) => (
+									<div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/3 border border-white/5">
+										<tag.i size={10} style={{ color: tag.c }} />
+										<span className="text-[9px] font-black uppercase tracking-widest text-gray-500">{tag.l}</span>
+									</div>
+								))}
+							</div>
 						</motion.div>
 					) : (
-						<ChatWindow
-							messages={messages}
-							onSend={handleSendMessage}
-							onEdit={handleEditMessage}
-							onDelete={handleDeleteMessage}
-							onReact={handleReact}
-							onPin={handlePin}
-							onUnpin={handleUnpin}
-							currentUser={user}
-							partner={userList.find(u => u._id === activeUserId)}
-							isPartnerTyping={typingUsers[selectedChat._id]?.length > 0}
-							onTypingStart={() => socketRef.current.emit('typing', { chatId: selectedChat._id })}
-							onTypingStop={() => socketRef.current.emit('stopTyping', { chatId: selectedChat._id })}
-							onBack={() => { setMobileShowChat(false); setActiveUserId(null); }}
-							pinnedMessages={pinnedMessages}
-							onBlock={handleBlock}
-							onUnblock={handleUnblock}
-							onReport={handleReport}
-						/>
+						/* Active chat interface */
+						<motion.div
+							key="chat"
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							exit={{ opacity: 0 }}
+							className="h-full"
+						>
+							<ChatWindow
+								currentUser={user}
+								partner={userList.find((u) => u._id === activeUserId)}
+								messages={messages}
+								onSend={handleSendMessage}
+								onBack={() => { setMobileShowChat(false); setSelectedChat(null); }}
+								pinnedMessages={pinnedMessages}
+								isPartnerTyping={(typingUsers[selectedChat._id] || []).length > 0}
+								onTypingStart={() => socketRef.current?.emit("typing", { chatId: selectedChat._id, userId: user._id })}
+								onTypingStop={() => socketRef.current?.emit("stopTyping", { chatId: selectedChat._id, userId: user._id })}
+								onEdit={handleEditMessage}
+								onDelete={handleDeleteMessage}
+								onReact={handleReact}
+								onPin={handlePin}
+								onUnpin={handleUnpin}
+								onBlock={handleBlock}
+								onUnblock={handleUnblock}
+								onReport={handleReport}
+							/>
+						</motion.div>
 					)}
 				</AnimatePresence>
 			</main>

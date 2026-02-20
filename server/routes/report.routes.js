@@ -1,5 +1,5 @@
 import express from 'express';
-import { reportUser } from '../controllers/report.controllers.js';
+import { reportUser, getMyReports } from '../controllers/report.controllers.js';
 import { Authenticate } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
@@ -7,5 +7,6 @@ const router = express.Router();
 router.use(Authenticate);
 
 router.post('/', reportUser);
+router.get('/', getMyReports);
 
 export default router;

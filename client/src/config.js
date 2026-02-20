@@ -1,1 +1,1 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3334";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://chatapplication-server-9nas.onrender.com";

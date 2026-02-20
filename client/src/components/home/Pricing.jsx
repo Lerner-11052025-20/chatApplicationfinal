@@ -38,7 +38,7 @@ const Pricing = () => {
                 'Multi-Node Mesh',
                 'Priority Latency',
                 '100GB Core Storage',
-                'Terminal Hooks',
+                'Messenger Hooks',
                 'Dossier Analytics'
             ],
             cta: 'Sign Up Now',
@@ -135,8 +135,8 @@ const Pricing = () => {
                                 transition={{ delay: index * 0.1 }}
                                 whileHover={{ y: -10 }}
                                 className={`relative group p-8 rounded-[2.5rem] border transition-all duration-500 ${plan.popular
-                                        ? 'bg-white/5 border-brand-blue/30 shadow-[0_0_50px_rgba(59,130,246,0.1)]'
-                                        : 'bg-white/[0.02] border-white/10 hover:border-white/20'
+                                    ? 'bg-white/5 border-brand-blue/30 shadow-[0_0_50px_rgba(59,130,246,0.1)]'
+                                    : 'bg-white/[0.02] border-white/10 hover:border-white/20'
                                     }`}
                             >
                                 {plan.popular && (
@@ -172,8 +172,8 @@ const Pricing = () => {
                                 <button
                                     onClick={() => navigate('/signup')}
                                     className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all duration-300 mb-8 ${plan.popular
-                                            ? 'bg-gradient-to-r from-brand-blue to-brand-indigo text-white shadow-lg shadow-brand-blue/20 hover:scale-[1.02] active:scale-[0.98]'
-                                            : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'
+                                        ? 'bg-gradient-to-r from-brand-blue to-brand-indigo text-white shadow-lg shadow-brand-blue/20 hover:scale-[1.02] active:scale-[0.98]'
+                                        : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'
                                         }`}
                                 >
                                     {plan.cta}

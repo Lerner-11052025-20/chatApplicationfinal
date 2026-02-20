@@ -66,9 +66,45 @@ export const unblockUser = async (req, res) => {
 
 export const getBlockedUsers = async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).populate('blockedUsers', 'username profilePic');
-        res.json(user.blockedUsers);
+        console.log("Fetching blocked users for ID:", req.user.id);
+        const user = await User.findById(req.user.id).populate('blockedUsers', 'username email profilePic');
+        if (!user) {
+            console.log("User not found in DB for ID:", req.user.id);
+            return res.status(404).json({ message: "User not found" });
+        }
+        console.log(`Found ${user.blockedUsers?.length || 0} blocked users`);
+        res.json({ blockedUsers: user.blockedUsers || [] });
     } catch (err) {
+        console.error("DEBUG ERROR in getBlockedUsers:", err);
         res.status(500).json({ message: "Server error fetching blocked users" });
+    }
+};
+
+export const getActivityLogs = async (req, res) => {
+    try {
+        const myId = req.user.id;
+        const user = await User.findById(myId);
+
+        let query = {};
+        if (user.role !== 'admin') {
+            // Regular users see actions they performed or actions done to them
+            query = {
+                $or: [
+                    { admin: myId },
+                    { targetUser: myId }
+                ]
+            };
+        }
+
+        const logs = await AuditLog.find(query)
+            .populate('admin', 'username profilePic')
+            .populate('targetUser', 'username email profilePic')
+            .sort({ createdAt: -1 })
+            .limit(50);
+
+        res.json({ logs });
+    } catch (err) {
+        console.error("getActivityLogs error:", err);
+        res.status(500).json({ message: "Server error fetching activity logs" });
     }
 };

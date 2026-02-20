@@ -24,3 +24,18 @@ export const reportUser = async (req, res) => {
         res.status(500).json({ message: "Server error submitting report" });
     }
 };
+export const getMyReports = async (req, res) => {
+    try {
+        console.log("Fetching reports for reporter ID:", req.user.id);
+        const reporterId = req.user.id;
+        const reports = await Report.find({ reporter: reporterId })
+            .populate('reportedUser', 'username email profilePic')
+            .sort({ createdAt: -1 });
+
+        console.log(`Found ${reports?.length || 0} reports`);
+        res.status(200).json({ reports: reports || [] });
+    } catch (err) {
+        console.error("DEBUG ERROR in getMyReports:", err);
+        res.status(500).json({ message: "Server error fetching your reports" });
+    }
+};

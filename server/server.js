@@ -20,7 +20,11 @@ import { Chat } from "./models/chat.models.js";
 dotenv.config();
 const app = express();
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+	origin: "*", // Or specify your frontend URL for better security
+	methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+	allowedHeaders: ["Content-Type", "Authorization"]
+}));
 
 // Track online users: Map<userId, socketId> or Map<userId, socketCount>
 const onlineUsers = new Map();
@@ -202,17 +206,18 @@ io.on("connection", (socket) => {
 			if (!msg || msg.isDeleted) return;
 
 			const userId = socket.user.id.toString();
-			const existingIndex = (msg.reactions || []).findIndex(r => r.userId.toString() === userId);
+			if (!msg.reactions) msg.reactions = [];
+
+			// Find if this specific emoji reaction by this specific user already exists
+			const existingIndex = msg.reactions.findIndex(r =>
+				r.userId.toString() === userId && r.emoji === emoji
+			);
 
 			if (existingIndex !== -1) {
-				if (msg.reactions[existingIndex].emoji === emoji) {
-					msg.reactions.splice(existingIndex, 1);
-				} else {
-					msg.reactions[existingIndex].emoji = emoji;
-					msg.reactions[existingIndex].reactedAt = new Date();
-				}
+				// If it exists, remove it (toggle off)
+				msg.reactions.splice(existingIndex, 1);
 			} else {
-				if (!msg.reactions) msg.reactions = [];
+				// If it doesn't exist, add it
 				msg.reactions.push({ userId, emoji });
 			}
 
