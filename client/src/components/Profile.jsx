@@ -109,8 +109,8 @@ const InfoCard = ({ icon: Icon, label, value, colorCls, bgCls, copiedKey, onCopy
 				whileTap={{ scale: 0.88 }}
 				onClick={() => onCopy(value, label)}
 				className={`p-2.5 rounded-xl transition-all duration-200 flex-shrink-0 ${isCopied
-						? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
-						: "text-gray-600 hover:text-white hover:bg-white/8 border border-transparent"
+					? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+					: "text-gray-600 hover:text-white hover:bg-white/8 border border-transparent"
 					}`}
 				title="Copy"
 			>
@@ -368,6 +368,38 @@ function Profile() {
 							</motion.div>
 						</div>
 					</motion.div>
+
+					{/* ════════════════════════
+              ADMIN PANEL (Conditional)
+          ════════════════════════ */}
+					{fullUser?.role === 'admin' && (
+						<motion.div variants={slideUp} className="relative group">
+							<motion.button
+								whileHover={{ scale: 1.02, y: -2 }}
+								whileTap={{ scale: 0.98 }}
+								onClick={() => navigate("/admin")}
+								className="w-full p-6 rounded-[2rem] flex items-center justify-between border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 shadow-[0_0_30px_rgba(245,158,11,0.1)] hover:border-amber-500/50 transition-all overflow-hidden relative group"
+							>
+								{/* Decorative Background Elements */}
+								<div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+								<div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2" />
+
+								<div className="flex items-center gap-5 relative z-10">
+									<div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
+										<Shield size={28} className="text-white" />
+									</div>
+									<div className="text-left">
+										<h3 className="text-xl font-black text-white tracking-tight leading-none mb-1">Admin Control Center</h3>
+										<p className="text-[11px] text-amber-500/80 font-black uppercase tracking-[0.15em]">Global Infrastructure Management</p>
+									</div>
+								</div>
+
+								<div className="w-12 h-12 rounded-full border border-amber-500/20 flex items-center justify-center text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-all relative z-10">
+									<ChevronRight size={20} />
+								</div>
+							</motion.button>
+						</motion.div>
+					)}
 
 					{/* ════════════════════════
               ACCOUNT INFO
